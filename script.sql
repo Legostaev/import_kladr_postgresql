@@ -167,26 +167,26 @@ INSERT INTO W_LOCALITY(NAME, W_LOCALITY_TYPE_ID, KLADR_ID)
 		FROM
 			T3 INNER JOIN T4 ON T4.CODE=T3.CODE
 		WHERE
-		    	T4.HOUSE >= T3.HOUSE[1]::INT AND
+			T4.HOUSE >= T3.HOUSE[1]::INT AND
 			(T4.HOUSE + 2) <= T3.HOUSE[2]::INT) 	
 	SELECT 
 		CODE,
 		TYPE,
-		HOUSE 
+		to_char(HOUSE, '999') 
 	FROM 
 		T2
 	UNION ALL
 	SELECT 
 		CODE,
 		TYPE,
-		HOUSE
+		to_char(HOUSE, '999')
 	FROM
 		T4
 	UNION ALL
 	SELECT
-		HOUSE,
+		CODE,
 		TYPE,
-		CODE 
+		HOUSE		
 	FROM	
 		(SELECT 
 			unnest(string_to_array(HOUSE, ',')) as HOUSE, 
@@ -196,7 +196,7 @@ INSERT INTO W_LOCALITY(NAME, W_LOCALITY_TYPE_ID, KLADR_ID)
 			kladr_base.w_doma_tbl) T1
 	WHERE
 		HOUSE!~'^[0-9]+-[0-9]+$' AND
-        	HOUSE!~'^(Н|Ч)\([0-9]+-[0-9]+\)$';
+        	HOUSE!~'^(Н|Ч)\([0-9]+-[0-9]+\)$';	
 
 CREATE INDEX W_LOCALITY_KLADR_ID_TMP_IDX on W_LOCALITY(
 	char_length(KLADR_ID), 
