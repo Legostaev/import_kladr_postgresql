@@ -178,14 +178,14 @@ INSERT INTO W_LOCALITY(KLADR_ID, W_LOCALITY_TYPE_ID, NAME)
 	SELECT 
 		CODE,
 		TYPE,
-		to_char(HOUSE, '999') 
+		to_char(HOUSE, '99999') 
 	FROM 
 		T2
 	UNION ALL
 	SELECT 
 		CODE,
 		TYPE,
-		to_char(HOUSE, '999')
+		to_char(HOUSE, '99999')
 	FROM
 		T4
 	UNION ALL
