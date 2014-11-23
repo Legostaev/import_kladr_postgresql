@@ -106,13 +106,103 @@ INSERT INTO W_LOCALITY_ALIAS(NAME, W_LOCALITY_ID, KLADR_ID)
 
 DROP INDEX W_LOCALITY_KLADR_ID;
 
-INSERT INTO W_LOCALITY(NAME, W_LOCALITY_TYPE_ID, KLADR_ID) 
+INSERT INTO W_LOCALITY(KLADR_ID, W_LOCALITY_TYPE_ID, NAME)
+	WITH RECURSIVE T1 as (
+		SELECT
+			row_number() over() as RN,
+			string_to_array(HOUSE, '-') as HOUSE,
+			(SELECT ID FROM W_LOCALITY_TYPE WHERE NAME=TYPE) as TYPE,
+			CODE
+		FROM 
+			(SELECT 
+				unnest(string_to_array(HOUSE, ',')) as HOUSE, 
+				TYPE AS TYPE,
+				CODE as CODE 
+			FROM 
+				kladr_base.w_doma_tbl) T10
+		WHERE
+			HOUSE~'^[0-9]+-[0-9]+$'),
+	T2(RN, CODE, TYPE, HOUSE) AS (
+		SELECT
+			RN,
+			CODE,
+			TYPE,
+			HOUSE[1]::INT AS HOUSE
+		FROM
+			T1
+		UNION ALL
+		SELECT 
+			T2.RN,
+			T2.CODE,
+			T2.TYPE,
+			T2.HOUSE + 1 AS HOUSE
+		FROM
+			T1 INNER JOIN T2 ON T2.RN=T1.RN
+		WHERE
+		    T2.HOUSE >= T1.HOUSE[1]::INT AND
+			(T2.HOUSE + 1) <= T1.HOUSE[2]::INT),
+	T3 as (
+		SELECT
+			row_number() over() as RN,
+			string_to_array(substring(HOUSE from '[0-9]+-[0-9]+'), '-') as HOUSE,
+			(SELECT ID FROM W_LOCALITY_TYPE WHERE NAME=TYPE) as TYPE, 
+			CODE
+		FROM 
+			(SELECT 
+				unnest(string_to_array(HOUSE, ',')) as HOUSE, 
+				TYPE as TYPE, 
+				CODE as CODE 
+			FROM 
+				kladr_base.w_doma_tbl) T10
+		WHERE
+			HOUSE~'^(Н|Ч)\([0-9]+-[0-9]+\)$'),
+	T4(RN, CODE, TYPE, HOUSE) AS (
+		SELECT
+			RN,
+			CODE,
+			TYPE,
+			HOUSE[1]::INT AS HOUSE
+		FROM
+			T3
+		UNION ALL
+		SELECT 
+			T4.RN,
+			T4.CODE,
+			T4.TYPE,
+			T4.HOUSE + 2 AS HOUSE
+		FROM
+			T3 INNER JOIN T4 ON T4.RN=T3.RN
+		WHERE
+		    	T4.HOUSE >= T3.HOUSE[1]::INT AND
+			(T4.HOUSE + 2) <= T3.HOUSE[2]::INT) 	
 	SELECT 
-		unnest(string_to_array(HOUSE, ',')), 
-		(SELECT ID FROM W_LOCALITY_TYPE WHERE NAME=TYPE), 
-		CODE 
+		CODE,
+		TYPE,
+		to_char(HOUSE, '999') 
 	FROM 
-		kladr_base.w_doma_tbl;
+		T2
+	UNION ALL
+	SELECT 
+		CODE,
+		TYPE,
+		to_char(HOUSE, '999')
+	FROM
+		T4
+	UNION ALL
+	SELECT
+		CODE,
+		TYPE,
+		HOUSE		
+	FROM	
+		(SELECT 
+			unnest(string_to_array(HOUSE, ',')) as HOUSE, 
+			(SELECT ID FROM W_LOCALITY_TYPE WHERE NAME=TYPE) as TYPE, 
+			CODE as CODE 
+		FROM 
+			kladr_base.w_doma_tbl) T1
+	WHERE
+		HOUSE!~'^[0-9]+-[0-9]+$' AND
+        	HOUSE!~'^(Н|Ч)\([0-9]+-[0-9]+\)$';
 
 CREATE INDEX W_LOCALITY_KLADR_ID_TMP_IDX on W_LOCALITY(
 	char_length(KLADR_ID), 
