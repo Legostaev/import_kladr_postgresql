@@ -718,4 +718,64 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+ALTER TABLE W_LOCALITY ADD COORD POINT DEFAULT NULL;
+
+
+CREATE OR REPLACE FUNCTION update_yandex_gps_coord(v_cnt integer) 
+RETURNS integer AS $$
+DECLARE
+	v_res		integer;
+BEGIN	
+	WITH T1 AS (
+		SELECT 
+			ID 
+		FROM
+			W_LOCALITY_TYPE
+		WHERE
+			LOWER(NAME)='дом'),
+	T2 AS (
+		SELECT
+			W_LOCALITY.ID AS ID,
+			(SELECT 
+				xpath(
+					'/xmlns1:ymaps/xmlns1:GeoObjectCollection/xmlns2:featureMember/xmlns1:GeoObject/xmlns2:Point/xmlns2:pos/text()'::varchar, 
+					"content"::xml, 
+					ARRAY[
+						ARRAY['xmlns1', 'http://maps.yandex.ru/ymaps/1.x'], 
+						ARRAY['xmlns2', 'http://www.opengis.net/gml']]) COORD
+			FROM 
+				http_get(
+					concat(
+						'http://geocode-maps.yandex.ru/1.x/?geocode=', 
+						get_kladr_full_address(W_LOCALITY.ID)))) AS CONTENT 
+		FROM
+			W_LOCALITY, T1
+		WHERE
+			W_LOCALITY_TYPE_ID=T1.ID AND
+			W_LOCALITY.COORD IS NULL 
+		LIMIT v_cnt),
+	T3 AS (
+		SELECT
+			T2.ID AS ID,
+			unnest(T2.CONTENT) AS COORD
+		FROM
+			T2),
+	T4 AS (	
+		SELECT 
+			ID, 
+			string_to_array(T3.COORD::varchar, ' ') AS COORD 
+		FROM T3),
+	T5 AS (
+		SELECT 
+			ID,
+			POINT(COORD[1]::double precision, COORD[2]::double precision) AS COORD
+		FROM
+			T4)
+	UPDATE W_LOCALITY SET COORD=T6.COORD FROM (SELECT ID, COORD FROM T5) T6 WHERE W_LOCALITY.ID=T6.ID;
+
+	GET DIAGNOSTICS v_res = ROW_COUNT;
+
+	RETURN v_res;
+END;
+$$ LANGUAGE plpgsql;
 	
